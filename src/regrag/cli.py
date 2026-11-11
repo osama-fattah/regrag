@@ -117,18 +117,28 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # show the provider's own error text (e.g. Gemini's JSON-array errors)
         if type(e).__module__.startswith("google.genai") and hasattr(e, "message"):
             # google-genai errors carry .code / .message
-            print(f"Gemini API error {getattr(e, 'code', '?')}: {e.message}", file=sys.stderr)
-            print("Check GEMINI_API_KEY and REGRAG_LLM_MODEL.", file=sys.stderr)
+            code = getattr(e, "code", None)
+            print(f"Gemini API error {code}: {e.message}", file=sys.stderr)
+            print(_hint(code, "GEMINI_API_KEY"), file=sys.stderr)
             return 1
         resp = getattr(e, "response", None)
         if resp is None or not hasattr(resp, "text"):
             raise
-        print(f"Model API error {getattr(resp, 'status_code', '?')}: {resp.text[:1500]}", file=sys.stderr)
-        print(
-            "Check OPENAI_API_KEY, OPENAI_BASE_URL (with trailing slash) and REGRAG_LLM_MODEL.",
-            file=sys.stderr,
-        )
+        code = getattr(resp, "status_code", None)
+        print(f"Model API error {code}: {resp.text[:1500]}", file=sys.stderr)
+        print(_hint(code, "OPENAI_API_KEY / OPENAI_BASE_URL (with trailing slash)"), file=sys.stderr)
         return 1
+
+
+def _hint(code, key_vars: str) -> str:
+    if code in (429, 500, 502, 503, 504):
+        return (
+            "The provider is busy or rate-limiting; retries were already attempted. Wait a few "
+            "minutes, lower REGRAG_MAX_RPM, or set REGRAG_LLM_MODEL to a lighter model."
+        )
+    if code == 404:
+        return "Model not found: set REGRAG_LLM_MODEL to a model your key can access."
+    return f"Check {key_vars} and REGRAG_LLM_MODEL."
 
 
 if __name__ == "__main__":

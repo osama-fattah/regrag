@@ -93,15 +93,28 @@ class BedrockChat:
         return LLMResult(text, u.get("inputTokens", 0), u.get("outputTokens", 0))
 
 
+def _gemini_client(http_client=None):
+    """google-genai client with retries + exponential backoff on 429 / 5xx ("model overloaded"
+    503s are common on the free tier). REGRAG_MAX_RETRIES sets the attempt count."""
+    from google import genai
+    from google.genai import types
+
+    retry = types.HttpRetryOptions(
+        attempts=int(os.getenv("REGRAG_MAX_RETRIES", "8")),
+        initial_delay=2.0,
+        max_delay=60.0,
+        http_status_codes=[408, 429, 500, 502, 503, 504],
+    )
+    return genai.Client(http_options=types.HttpOptions(retry_options=retry, httpx_client=http_client))
+
+
 class GeminiChat:
     """Google Gemini via the native google-genai SDK (works with the new "AQ." auth keys, which the
     OpenAI-compatible endpoint rejects). Reads GEMINI_API_KEY or GOOGLE_API_KEY."""
 
     def __init__(self, model: str, client=None):
         if client is None:
-            from google import genai
-
-            client = genai.Client()
+            client = _gemini_client()
         self.client, self.model = client, model
         self.name = f"gemini:{model}"
 
@@ -295,9 +308,7 @@ class GeminiToolChat:
 
     def __init__(self, model: str, client=None):
         if client is None:
-            from google import genai
-
-            client = genai.Client()
+            client = _gemini_client()
         self.client, self.model = client, model
         self.name = f"gemini:{model}"
         self.contents: list = []

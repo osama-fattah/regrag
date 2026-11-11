@@ -80,9 +80,9 @@ class BedrockEmbedder:
 class GeminiEmbedder:
     def __init__(self, model: str = "gemini-embedding-001", client=None):
         if client is None:
-            from google import genai
+            from regrag.llm import _gemini_client
 
-            client = genai.Client()
+            client = _gemini_client()
         self.client, self.model = client, model
         self.name = f"gemini:{model}"
 
