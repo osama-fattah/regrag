@@ -8,6 +8,8 @@ pipeline's own verify step, and is reported as the share of answered questions t
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from statistics import mean
 
 
@@ -36,9 +38,13 @@ def recall_at_k(ranked_docs: list[str], gold: list[str], k: int) -> float:
     return len(set(ranked_docs[:k]) & set(gold)) / len(gold) if gold else 0.0
 
 
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text)).lower()
+
+
 def key_fact_recall(answer: str, facts: list[str]) -> float:
-    a = answer.lower()
-    return sum(f.lower() in a for f in facts) / len(facts) if facts else 1.0
+    a = _norm(answer)
+    return sum(_norm(f) in a for f in facts) / len(facts) if facts else 1.0
 
 
 def citation_precision(cited_docs: list[str], gold: list[str]) -> float:

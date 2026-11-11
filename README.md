@@ -180,27 +180,39 @@ Tools are annotated read-only and non-destructive. Each document is also availab
 Gold set: 25 answerable questions across 8 SOPs and policies, plus 3 out-of-scope questions the system
 must refuse. Each question lists its source document(s) and the key facts a correct answer must state.
 
-**Offline baseline** (`heuristic-extractive` + `hashing-2048` embeddings; runs in CI on every push):
+Results on the same gold set, offline and on a real model:
 
-| Metric | Value | What it means |
-| --- | --- | --- |
-| hit@3 / MRR | 1.00 / 1.00 | Correct SOP retrieved first for every question |
-| Key-fact recall | 0.88 | Answer states the required fact (e.g. "15 calendar days") |
-| Citation precision | 1.00 | Every cited source is the correct document |
-| Grounded rate | 1.00 | Every answer passed the verifier |
-| Abstention accuracy | 1.00 | All out-of-scope questions refused |
-| Answer rate | 0.96 | Answerable questions not refused |
+| Metric | Offline baseline | Gemini (flash-lite) | What it means |
+| --- | --- | --- | --- |
+| hit@3 / MRR | 1.00 / 1.00 | 1.00 / 1.00 | Correct SOP retrieved first for every question |
+| Key-fact recall | 0.88 | **0.96** | Answer states the required fact (e.g. "15 calendar days") |
+| Citation precision | 1.00 | 1.00 | Every cited source is the correct document |
+| Grounded rate | 1.00 | 1.00 | Every answer passed the verifier |
+| Abstention accuracy | 1.00 | 1.00 | All out-of-scope questions refused |
+| Answer rate | 0.96 | 0.96 | Answerable questions not refused |
+| Answer relevancy (LLM judge) | n/a | 0.96 | How directly the answer addresses the question |
+
+The offline baseline (`heuristic-extractive` + `hashing-2048` embeddings) runs in CI on every push. The
+Gemini run used `gemini-flash-lite-latest` on the free tier with the same offline retrieval. Its mean
+latency of ~23 s per question is almost entirely the free-tier throttle (8 requests/minute, 3–4
+calls per question), not model time.
+
+**What the model fixed, and what it didn't.** The offline mode's misses were vocabulary gaps ("sales
+rep" vs "sales representative", "pass mark" vs "score required to pass"); Gemini answered all of them.
+Gemini's one miss was a false refusal: for *"Within what time must critical deviations be escalated
+to the Qualified Person?"* it retrieved the right passage and drafted an answer, but its own verifier
+flagged the draft as unsupported, so the pipeline abstained. That is the intended failure direction
+for a GxP assistant (refuse rather than risk a wrong deadline), and rejected drafts and the claims the
+verifier objected to are now written to the audit log for review.
 
 CI fails the build if hit@3 < 0.9, key-fact recall < 0.7 or abstention accuracy < 0.66. The gate earned
 its place during development: the first version of the offline grader answered 2 of 3 out-of-scope
 questions because generic words like "company" and "policy" counted as matches. IDF weighting and
-light stemming fixed it; the unit tests now pin that behaviour.
+light stemming fixed it; the unit tests now pin that behaviour. The real-model run also caught an
+evaluation bug: on Windows the gold file was read in the local code page, so "2 °C to 8 °C" never
+matched. Files are now read as UTF-8 and facts are matched after Unicode normalisation.
 
-The remaining misses (listed in `reports/eval_report.md`) are vocabulary gaps that need a language
-model: "sales rep" vs "sales representative", "pass mark" vs "score required to pass". On an 8-document
-corpus retrieval is near-trivial, so treat these as a regression baseline, not a benchmark.
-
-<!-- TODO: add a row for Bedrock (Claude Haiku + Titan v2) after running `regrag eval` with credentials -->
+On an 8-document corpus retrieval is near-trivial, so treat these as regression baselines, not a benchmark.
 
 ## Design decisions
 
@@ -232,7 +244,7 @@ src/regrag/         library, agent, API and CLI
 data/sample_corpus/ 8 synthetic SOPs for a fictional company (no real or confidential content)
 data/registers/     synthetic CAPA register (CSV) used by the agent and MCP server
 data/eval/          gold question set
-tests/              unit, pipeline, agent, MCP, Gemini, API and evaluation-gate tests (28)
+tests/              unit, pipeline, agent, MCP, Gemini, API and evaluation-gate tests (32)
 reports/            latest evaluation report
 ```
 

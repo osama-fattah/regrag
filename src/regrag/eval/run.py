@@ -14,7 +14,7 @@ DEFAULT_GATES = {"hit@3": 0.9, "key_fact_recall": 0.7, "abstention_accuracy": 0.
 
 
 def load_gold(path: str | Path) -> list[dict]:
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def evaluate(rag: RegRAG, gold: list[dict]) -> tuple[list[dict], dict]:
@@ -29,7 +29,10 @@ def evaluate(rag: RegRAG, gold: list[dict]) -> tuple[list[dict], dict]:
             "question": g["question"],
             "answerable": answerable,
             "abstained": a.abstained,
+            "abstain_reason": a.abstain_reason,
             "answer": a.answer,
+            "rejected_draft": a.rejected_draft,
+            "unsupported_claims": a.unsupported_claims,
             "cited_docs": [c.doc_id for c in a.citations],
             "grounded": float(a.grounded),
             "latency_ms": a.latency_ms,
@@ -66,7 +69,9 @@ def check_gates(summary: dict, gates: dict | None = None) -> list[str]:
 def write_report(rows: list[dict], summary: dict, out_dir: str | Path, label: str) -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "eval_results.json").write_text(json.dumps({"summary": summary, "rows": rows}, indent=1))
+    (out / "eval_results.json").write_text(
+        json.dumps({"summary": summary, "rows": rows}, indent=1), encoding="utf-8"
+    )
     lines = [f"# Evaluation report ({label})", "", "| Metric | Value |", "| --- | --- |"]
     lines += [f"| {k} | {v} |" for k, v in summary.items() if v is not None]
     misses = [r for r in rows if r["answerable"] and (r["abstained"] or r["key_fact_recall"] < 1)]
@@ -77,5 +82,5 @@ def write_report(rows: list[dict], summary: dict, out_dir: str | Path, label: st
             f"| {r['id']} | {r['question']} | {r['abstained']} | {r['key_fact_recall']:.2f} |" for r in misses
         ]
     path = out / "eval_report.md"
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
