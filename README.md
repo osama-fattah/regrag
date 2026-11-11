@@ -5,8 +5,8 @@ Hybrid retrieval, a LangGraph agent that checks its own work and refuses to gues
 agent that combines documents with a structured CAPA register, an **MCP server** so Claude Desktop or
 any MCP client can use it, PII guardrails, an audit log for every answer, and an evaluation suite
 that runs as a quality gate in CI. It runs fully
-offline out of the box and switches to **AWS Bedrock**, **Azure OpenAI** or **OpenAI** with one
-environment variable.
+offline out of the box and switches to **AWS Bedrock**, **Azure OpenAI**, **OpenAI** or **Google Gemini**
+with one environment variable.
 
 ![ci](https://github.com/osama-fattah/regrag/actions/workflows/ci.yml/badge.svg)
 
@@ -48,11 +48,11 @@ flowchart LR
 | Ingestion | Markdown / text / PDF, section-aware chunking with overlap; titles and headings indexed with the body | `ingest.py` |
 | Hybrid retrieval | BM25 for exact terms ("ICSR", "Type II") + dense embeddings for paraphrase, fused with Reciprocal Rank Fusion | `index.py` |
 | Agent | LangGraph state machine: retrieve → grade → (rewrite) → generate → verify → answer or abstain | `graph.py` |
-| Reasoning strategies | `LLMReasoner` (Bedrock Converse, Azure OpenAI, OpenAI) or `HeuristicReasoner` (offline, extractive, IDF-weighted) behind one interface | `reasoners.py` |
+| Reasoning strategies | `LLMReasoner` (Bedrock Converse, Azure OpenAI, OpenAI, Gemini) or `HeuristicReasoner` (offline, extractive, IDF-weighted) behind one interface | `reasoners.py` |
 | Guardrails | Redacts emails, phone numbers, patient IDs and dates of birth before anything is logged or sent to a model; flags prompt-injection patterns; retrieved text is fenced as data in prompts | `guardrails.py`, `prompts.py` |
 | Audit log | One JSONL record per request: hashed user, redacted question, retrieved and cited chunks, model, embedder, grounded/abstained, tokens, latency | `audit.py` |
 | Evaluation | Retrieval (hit@k, MRR, recall@k), answer (key-fact recall, citation precision, grounded rate), abstention accuracy, optional LLM-judge relevancy, CI quality gate | `eval/` |
-| Tool-calling agent | Planner/executor loop with native tool calling (OpenAI, Azure OpenAI, Bedrock Converse) over SOP search, cited answers and a CAPA register; validated JSON output with one repair attempt; offline deterministic planner for CI | `agent.py`, `tools.py`, `llm.py` |
+| Tool-calling agent | Planner/executor loop with native tool calling (OpenAI, Azure OpenAI, Bedrock Converse, Gemini) over SOP search, cited answers and a CAPA register; validated JSON output with one repair attempt; offline deterministic planner for CI | `agent.py`, `tools.py`, `llm.py` |
 | MCP server | The same read-only tools plus a `regrag://documents/{doc_id}` resource, over stdio | `mcp_server.py` |
 | Serving | Streamlit demo UI, FastAPI (`/ask`, `/health`), Docker image with a non-root user, GitHub Actions CI with a container smoke test | `api.py`, `Dockerfile` |
 
@@ -90,18 +90,25 @@ pip install -e ".[bedrock,openai]"
 regrag ingest && regrag eval
 ```
 
-### Free option: Gemini or GitHub Models
+### Free option: Google Gemini
 
-The `openai` provider works with any OpenAI-compatible endpoint, so the free tiers of Google Gemini and
-GitHub Models run the full pipeline and agent with no code changes:
+Gemini's free tier runs the full pipeline and agent through the native `google-genai` SDK, which
+accepts Google's new `AQ.` auth keys (the OpenAI-compatible endpoint rejects them):
 
 ```bash
-export OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-export OPENAI_API_KEY=<Gemini API key from Google AI Studio>
-export REGRAG_LLM=openai REGRAG_LLM_MODEL=gemini-2.5-flash
-export REGRAG_MAX_RPM=8          # stay under the free-tier rate limit
-pip install -e ".[openai]" && regrag eval
+pip install -e ".[gemini]"
+export GEMINI_API_KEY=<key from Google AI Studio>
+export REGRAG_LLM=gemini              # model defaults to gemini-flash-latest
+export REGRAG_MAX_RPM=8               # stay under the free-tier rate limit
+regrag eval
 ```
+
+Gemini embeddings are available too (`REGRAG_EMBEDDINGS=gemini`, then re-run `regrag ingest`). The
+provider is tested against Google's real SDK with a mocked HTTP transport, so request payloads and
+response parsing are checked in CI without a key.
+
+Any other OpenAI-compatible endpoint (e.g. GitHub Models) works with `REGRAG_LLM=openai` and
+`OPENAI_BASE_URL`.
 
 Point `regrag ingest --src` at any folder of PDFs (for example public EMA or ICH guidelines) to use
 your own corpus, and add questions to `data/eval/gold.jsonl`.
@@ -225,7 +232,7 @@ src/regrag/         library, agent, API and CLI
 data/sample_corpus/ 8 synthetic SOPs for a fictional company (no real or confidential content)
 data/registers/     synthetic CAPA register (CSV) used by the agent and MCP server
 data/eval/          gold question set
-tests/              unit, pipeline, agent, MCP, API and evaluation-gate tests (25)
+tests/              unit, pipeline, agent, MCP, Gemini, API and evaluation-gate tests (28)
 reports/            latest evaluation report
 ```
 

@@ -77,6 +77,23 @@ class BedrockEmbedder:
         return _normalise(np.asarray(out, dtype=np.float32))
 
 
+class GeminiEmbedder:
+    def __init__(self, model: str = "gemini-embedding-001", client=None):
+        if client is None:
+            from google import genai
+
+            client = genai.Client()
+        self.client, self.model = client, model
+        self.name = f"gemini:{model}"
+
+    def embed(self, texts: list[str]) -> np.ndarray:
+        out = []
+        for i in range(0, len(texts), 100):
+            r = self.client.models.embed_content(model=self.model, contents=texts[i : i + 100])
+            out.extend(e.values for e in r.embeddings)
+        return _normalise(np.asarray(out, dtype=np.float32))
+
+
 def get_embedder(settings: Settings) -> Embedder:
     p, m = settings.embed_provider, settings.embed_model
     if p == "hashing":
@@ -87,4 +104,6 @@ def get_embedder(settings: Settings) -> Embedder:
         return OpenAIEmbedder(m or "text-embedding-3-small", azure=True)
     if p == "bedrock":
         return BedrockEmbedder(m or "amazon.titan-embed-text-v2:0", settings.aws_region)
+    if p == "gemini":
+        return GeminiEmbedder(m or "gemini-embedding-001")
     raise ValueError(f"Unknown embedding provider: {p}")

@@ -115,6 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _main(argv)
     except Exception as e:  # show the provider's own error text (e.g. Gemini's JSON-array errors)
+        if type(e).__module__.startswith("google.genai") and hasattr(e, "message"):
+            # google-genai errors carry .code / .message
+            print(f"Gemini API error {getattr(e, 'code', '?')}: {e.message}", file=sys.stderr)
+            print("Check GEMINI_API_KEY and REGRAG_LLM_MODEL.", file=sys.stderr)
+            return 1
         resp = getattr(e, "response", None)
         if resp is None or not hasattr(resp, "text"):
             raise
