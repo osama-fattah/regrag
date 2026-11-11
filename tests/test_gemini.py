@@ -111,3 +111,24 @@ def toolbox_with_register(rag):
 
     root = Path(__file__).resolve().parents[1]
     return Toolbox(rag, CapaRegister.load(root / "data/registers/capa_register.csv"))
+
+
+def test_gemini_retries_on_overloaded_503(monkeypatch):
+    """Free-tier 503 'model overloaded' responses are retried with backoff, then succeed."""
+    from regrag.llm import _gemini_client
+
+    monkeypatch.setenv("GEMINI_API_KEY", KEY)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) < 3:
+            return httpx.Response(
+                503, json={"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}}
+            )
+        return httpx.Response(200, json=_candidate([{"text": "ok"}]))
+
+    monkeypatch.setattr("time.sleep", lambda s: None)  # don't actually wait in tests
+    client = _gemini_client(http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert GeminiChat("gemini-flash-latest", client=client).complete("s", "u").text == "ok"
+    assert len(calls) == 3
