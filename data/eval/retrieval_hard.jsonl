@@ -1,0 +1,22 @@
+{"id": "h01", "question": "If a field rep hears about a side effect on Friday, when does our reporting clock begin?", "key_facts": ["first becomes aware"]}
+{"id": "h02", "question": "What's the cutoff for sending a non-urgent side-effect report from Europe to the EU database?", "key_facts": ["90 calendar days"]}
+{"id": "h03", "question": "Which four things must a safety report contain before we treat it as a proper case?", "key_facts": ["identifiable reporter"]}
+{"id": "h04", "question": "How fast does a supervisor need to sign off on a newly logged process slip?", "key_facts": ["acknowledge the record within one business day"]}
+{"id": "h05", "question": "Who decides whether product that got too warm in a lorry can still be sold, and by when?", "key_facts": ["qualified person within five business days"]}
+{"id": "h06", "question": "Can two lab analysts share one login on the chromatography system?", "key_facts": ["shared or generic user accounts are prohibited"]}
+{"id": "h07", "question": "How often should someone look through the change history of critical lab data?", "key_facts": ["at least monthly"]}
+{"id": "h08", "question": "After a fix for a quality problem is put in place, when do we check that it actually worked?", "key_facts": ["90 days after the capa is implemented"]}
+{"id": "h09", "question": "Is a home-grown bespoke application held to stricter validation than off-the-shelf software?", "key_facts": ["category 5 covers custom"]}
+{"id": "h10", "question": "When a machine-learning model gets retrained, what process must it go through before release?", "key_facts": ["goes through change control"]}
+{"id": "h11", "question": "Can I paste trial results that haven't been published yet into a chatbot?", "key_facts": ["unpublished clinical trial results"]}
+{"id": "h12", "question": "Who is on the hook for AI-written text that goes into a submission to a regulator?", "key_facts": ["the reviewer is accountable"]}
+{"id": "h13", "question": "How long do we keep records of what our in-house assistant was asked?", "key_facts": ["at least two years"]}
+{"id": "h14", "question": "We need to swap something urgently - can we do it before the paperwork is signed off?", "key_facts": ["emergency changes may be implemented with verbal qa approval"]}
+{"id": "h15", "question": "What happens to change tickets that have been sitting open for half a year?", "key_facts": ["180 days"]}
+{"id": "h16", "question": "Vials were found frozen in the van - can they still be used?", "key_facts": ["must be rejected"]}
+{"id": "h17", "question": "What score do I need to pass the test on aseptic technique?", "key_facts": ["at least 80%"]}
+{"id": "h18", "question": "How many tries do I get on a failed training test before an expert has to retrain me?", "key_facts": ["retake the assessment once"]}
+{"id": "h19", "question": "Someone left the company - how quickly must their system access be removed?", "key_facts": ["disabled within one business day"]}
+{"id": "h20", "question": "How long after a batch expires must we keep its GMP paperwork?", "key_facts": ["ten years after the expiry"]}
+{"id": "h21", "question": "Who should I tell if I think a colleague is faking lab data?", "key_facts": ["confidential ethics line"]}
+{"id": "h22", "question": "What makes a drug reaction count as serious?", "key_facts": ["requires or prolongs hospitalisation"]}

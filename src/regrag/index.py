@@ -49,6 +49,9 @@ class HybridIndex:
         self.vectors = vectors
         self.embedder = embedder
         self.bm25 = BM25([content_tokens(c.retrieval_text) for c in chunks])
+        # Optional cross-encoder (see rerank.py): re-orders the fused candidate pool.
+        self.reranker = None
+        self.rerank_pool = 20
 
     @classmethod
     def build(cls, chunks: list[Chunk], embedder: Embedder) -> HybridIndex:
@@ -65,8 +68,14 @@ class HybridIndex:
                 fused[int(i)] = fused.get(int(i), 0.0) + 1.0 / (rrf_k + rank + 1)
         lex_rank = {int(i): r for r, i in enumerate(lex_order)}
         dense_rank = {int(i): r for r, i in enumerate(dense_order)}
-        best = sorted(fused, key=fused.get, reverse=True)[:k]
-        return [Hit(self.chunks[i], fused[i], lex_rank.get(i), dense_rank.get(i)) for i in best]
+        ordered = sorted(fused, key=fused.get, reverse=True)
+        if self.reranker is None:
+            best = ordered[:k]
+            return [Hit(self.chunks[i], fused[i], lex_rank.get(i), dense_rank.get(i)) for i in best]
+        cand = ordered[: max(k, self.rerank_pool)]
+        scores = self.reranker.score(query, [self.chunks[i].retrieval_text for i in cand])
+        reranked = sorted(zip(cand, scores, strict=True), key=lambda x: -x[1])[:k]
+        return [Hit(self.chunks[i], float(sc), lex_rank.get(i), dense_rank.get(i)) for i, sc in reranked]
 
     def save(self, path: str | Path) -> None:
         path = Path(path)

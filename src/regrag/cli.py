@@ -26,6 +26,18 @@ def _main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("mcp", help="run the MCP server over stdio (for Claude Desktop etc.)")
 
+    pf = sub.add_parser("finetune", help="LoRA fine-tune a cross-encoder reranker and compare retrieval")
+    pf.add_argument("--base", default="cross-encoder/ms-marco-MiniLM-L-6-v2")
+    pf.add_argument("--out", default="models/reranker-lora")
+    pf.add_argument(
+        "--queries",
+        choices=["llm", "heuristic"],
+        default="llm",
+        help="who writes the synthetic training questions (llm needs REGRAG_LLM set)",
+    )
+    pf.add_argument("--epochs", type=int, default=3)
+    pf.add_argument("--rank", type=int, default=8, help="LoRA rank r")
+
     pe = sub.add_parser("eval", help="run the gold set and write a report")
     pe.add_argument("--gold", default="data/eval/gold.jsonl")
     pe.add_argument("--out", default="reports")
@@ -89,6 +101,9 @@ def _main(argv: list[str] | None = None) -> int:
         mcp_main()
         return 0
 
+    if args.cmd == "finetune":
+        return _finetune(args, s)
+
     if args.cmd == "eval":
         from regrag.eval.run import check_gates, evaluate, load_gold, write_report
         from regrag.pipeline import RegRAG
@@ -109,6 +124,75 @@ def _main(argv: list[str] | None = None) -> int:
         uvicorn.run("regrag.api:app", host=args.host, port=args.port)
         return 0
     return 2
+
+
+def _finetune(args, s: Settings) -> int:
+    from pathlib import Path
+
+    from regrag.embeddings import get_embedder
+    from regrag.eval.run import load_gold
+    from regrag.finetune import (
+        build_pairs,
+        heuristic_queries,
+        llm_queries,
+        retrieval_eval,
+        train_lora_reranker,
+    )
+    from regrag.index import HybridIndex
+    from regrag.llm import get_llm
+    from regrag.rerank import CrossEncoderReranker
+
+    index = HybridIndex.load(s.index_dir, get_embedder(s))
+    gold = load_gold("data/eval/gold.jsonl")
+    hard = load_gold("data/eval/retrieval_hard.jsonl")
+    llm = get_llm(s) if args.queries == "llm" else None
+    if args.queries == "llm" and llm is None:
+        print(
+            "--queries llm needs REGRAG_LLM set (e.g. gemini); using heuristic queries instead.",
+            file=sys.stderr,
+        )
+    query_fn = llm_queries(llm) if llm else heuristic_queries
+
+    print("Generating training queries ...")
+    pairs, dropped = build_pairs(index, query_fn, [g["question"] for g in gold + hard])
+    print(f"  {len(pairs)} training pairs; {dropped} queries dropped as too close to the eval sets")
+
+    rows = []
+
+    def measure(label: str) -> None:
+        rows.append((label, retrieval_eval(index, gold), retrieval_eval(index, hard)))
+
+    measure("hybrid (no reranker)")
+    index.reranker = CrossEncoderReranker(args.base)
+    measure(f"+ {Path(args.base).name} (pretrained)")
+    print("Training LoRA adapter ...")
+    summary = train_lora_reranker(pairs, index, args.base, args.out, epochs=args.epochs, r=args.rank)
+    print(
+        f"  {summary.trainable_params:,} of {summary.total_params:,} parameters trained; "
+        f"losses per epoch {summary.epoch_losses}; {summary.seconds}s"
+    )
+    index.reranker = CrossEncoderReranker(args.base, args.out)
+    measure("+ LoRA fine-tuned")
+
+    lines = [
+        "# Reranker evaluation (passage-level retrieval)",
+        "",
+        f"Training: {summary.n_pairs} synthetic queries ({args.queries}), {summary.n_examples} examples, "
+        f"LoRA r={summary.lora_r}, {summary.epochs} epochs, "
+        f"{summary.trainable_params:,}/{summary.total_params:,} parameters trained.",
+        "",
+        "| Retriever | Gold set hit@1 | Gold set MRR | Paraphrase set hit@1 | Paraphrase set MRR |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for label, g, h in rows:
+        cells = [g["passage_hit@1"], g["passage_mrr"], h["passage_hit@1"], h["passage_mrr"]]
+        lines.append(f"| {label} | " + " | ".join(str(c) for c in cells) + " |")
+    Path("reports").mkdir(exist_ok=True)
+    Path("reports/rerank_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines[4:]))
+    print("Report: reports/rerank_report.md")
+    print(f"Use it: set REGRAG_RERANKER={args.out}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
