@@ -45,6 +45,8 @@ class Answer:
     injection_suspected: bool
     latency_ms: int
     trace: list[str] = field(default_factory=list)
+    unsupported_claims: list[str] = field(default_factory=list)
+    rejected_draft: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -101,6 +103,8 @@ class RegRAG:
             injection_suspected=guard.injection_suspected,
             latency_ms=int((time.perf_counter() - t0) * 1000),
             trace=state.get("trace", []),
+            unsupported_claims=state.get("unsupported") or [],
+            rejected_draft=draft.text if (abstained and draft and state.get("unsupported")) else None,
         )
         self.audit.write(
             {
@@ -116,6 +120,8 @@ class RegRAG:
                 "grounded": ans.grounded,
                 "abstained": abstained,
                 "abstain_reason": ans.abstain_reason,
+                "unsupported_claims": ans.unsupported_claims,
+                "rejected_draft": ans.rejected_draft,
                 "input_tokens": self.reasoner.usage.input_tokens - before[0],
                 "output_tokens": self.reasoner.usage.output_tokens - before[1],
                 "latency_ms": ans.latency_ms,

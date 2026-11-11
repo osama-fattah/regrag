@@ -73,3 +73,21 @@ def test_api(rag):
     assert client.get("/health").json()["status"] == "ok"
     body = client.post("/ask", json={"question": "Are shared accounts allowed on GxP systems?"}).json()
     assert "prohibited" in body["answer"].lower()
+
+
+def test_rejected_draft_and_unsupported_claims_are_audited(index, tmp_path):
+    from regrag.audit import AuditLog
+    from regrag.pipeline import RegRAG
+
+    llm = FakeLLM(
+        [
+            "[1]",
+            "Serious cases are due in 3 days [1].",
+            '{"grounded": false, "unsupported_claims": ["3 days"]}',
+        ]
+    )
+    rag = RegRAG(index, LLMReasoner(llm), AuditLog(tmp_path / "a.jsonl"))
+    a = rag.ask("serious ICSR deadline?")
+    assert a.abstained and a.unsupported_claims == ["3 days"] and "3 days" in a.rejected_draft
+    record = json.loads((tmp_path / "a.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    assert record["unsupported_claims"] == ["3 days"] and record["rejected_draft"].startswith("Serious cases")

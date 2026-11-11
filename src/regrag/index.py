@@ -72,17 +72,19 @@ class HybridIndex:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         np.save(path / "vectors.npy", self.vectors)
-        (path / "chunks.json").write_text(json.dumps([c.to_dict() for c in self.chunks], indent=1))
-        (path / "meta.json").write_text(json.dumps({"embedder": self.embedder.name}))
+        (path / "chunks.json").write_text(
+            json.dumps([c.to_dict() for c in self.chunks], indent=1), encoding="utf-8"
+        )
+        (path / "meta.json").write_text(json.dumps({"embedder": self.embedder.name}), encoding="utf-8")
 
     @classmethod
     def load(cls, path: str | Path, embedder: Embedder) -> HybridIndex:
         path = Path(path)
-        meta = json.loads((path / "meta.json").read_text())
+        meta = json.loads((path / "meta.json").read_text(encoding="utf-8"))
         if meta["embedder"] != embedder.name:
             raise ValueError(
                 f"Index was built with {meta['embedder']} but current embedder is {embedder.name}; "
                 "re-run `regrag ingest`."
             )
-        chunks = [Chunk(**c) for c in json.loads((path / "chunks.json").read_text())]
+        chunks = [Chunk(**c) for c in json.loads((path / "chunks.json").read_text(encoding="utf-8"))]
         return cls(chunks, np.load(path / "vectors.npy"), embedder)
