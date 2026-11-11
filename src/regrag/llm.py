@@ -3,10 +3,43 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
+import time
 from dataclasses import dataclass
 from typing import Protocol
 
 from regrag.config import Settings
+
+
+class _Throttle:
+    """Spaces out calls to stay under a requests-per-minute cap (REGRAG_MAX_RPM), useful on free
+    tiers such as Gemini or GitHub Models. 0 or unset means no limit."""
+
+    def __init__(self):
+        self.rpm = float(os.getenv("REGRAG_MAX_RPM", "0") or 0)
+        self.last = 0.0
+        self.lock = threading.Lock()
+
+    def wait(self) -> None:
+        if self.rpm <= 0:
+            return
+        with self.lock:
+            gap = 60.0 / self.rpm - (time.monotonic() - self.last)
+            if gap > 0:
+                time.sleep(gap)
+            self.last = time.monotonic()
+
+
+_throttle = _Throttle()
+
+
+def _openai_client(azure: bool):
+    import openai
+
+    # Retries with exponential backoff on 429 / 5xx, which free tiers return often.
+    cls = openai.AzureOpenAI if azure else openai.OpenAI
+    return cls(max_retries=int(os.getenv("REGRAG_MAX_RETRIES", "8")))
 
 
 @dataclass
@@ -24,13 +57,12 @@ class LLM(Protocol):
 
 class OpenAIChat:
     def __init__(self, model: str, azure: bool = False):
-        import openai
-
-        self.client = openai.AzureOpenAI() if azure else openai.OpenAI()
+        self.client = _openai_client(azure)
         self.model = model
         self.name = f"{'azure' if azure else 'openai'}:{model}"
 
     def complete(self, system: str, user: str, max_tokens: int = 600) -> LLMResult:
+        _throttle.wait()
         r = self.client.chat.completions.create(
             model=self.model,
             temperature=0,
@@ -99,9 +131,7 @@ class OpenAIToolChat:
 
     def __init__(self, model: str, azure: bool = False, client=None):
         if client is None:
-            import openai
-
-            client = openai.AzureOpenAI() if azure else openai.OpenAI()
+            client = _openai_client(azure)
         self.client, self.model = client, model
         self.name = f"{'azure' if azure else 'openai'}:{model}"
         self.messages: list[dict] = []
@@ -118,6 +148,7 @@ class OpenAIToolChat:
         ]
 
     def step(self) -> ToolTurn:
+        _throttle.wait()
         r = self.client.chat.completions.create(
             model=self.model, messages=self.messages, tools=self.tools, temperature=0
         )
