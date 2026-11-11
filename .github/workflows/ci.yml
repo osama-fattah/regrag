@@ -42,3 +42,17 @@ jobs:
           curl -sf localhost:8000/health
           curl -sf -X POST localhost:8000/ask -H 'content-type: application/json' \
             -d '{"question":"How long must GxP records be retained?"}'
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Format
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+      - name: Validate
+        run: |
+          terraform -chdir=infra/terraform init -backend=false -input=false
+          terraform -chdir=infra/terraform validate
+      - name: Lambda image builds
+        run: docker build -f Dockerfile.lambda -t regrag-lambda .

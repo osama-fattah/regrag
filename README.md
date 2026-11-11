@@ -175,6 +175,35 @@ Claude Desktop (`claude_desktop_config.json`):
 Tools are annotated read-only and non-destructive. Each document is also available as a resource at
 `regrag://documents/{doc_id}`.
 
+## Deploy to AWS (Terraform)
+
+`infra/terraform` deploys RegRAG as a container on **AWS Lambda** behind a **function URL**, sized
+for the free tier:
+
+| Piece | Choice |
+| --- | --- |
+| Compute | Lambda container image (1 GB), FastAPI run unchanged via the AWS Lambda Web Adapter |
+| Endpoint | Function URL with `RESPONSE_STREAM`, so `POST /ask/stream` streams server-sent events; IAM auth by default (`public_url = true` only for demos) |
+| Model access | Least-privilege IAM: `bedrock:InvokeModel*` only when `llm_provider = "bedrock"`; Gemini key passed as a sensitive variable otherwise |
+| Images | ECR with scan-on-push and a keep-last-5 lifecycle rule |
+| Observability | Audit records written to stdout as JSON into a CloudWatch log group (14-day retention) |
+| Cost guardrail | Optional monthly budget with an email alert at 80% forecast |
+
+```bash
+cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars   # edit
+scripts/deploy.sh          # creates ECR, builds + pushes the image, applies the rest
+curl -X POST "$(terraform -chdir=infra/terraform output -raw function_url)ask/stream" \
+     -H 'content-type: application/json' -d '{"question":"How long must GxP records be retained?"}'
+```
+
+CI runs `terraform fmt`, `terraform validate` and builds the Lambda image on every push.
+
+### Streaming
+
+`POST /ask/stream` returns `text/event-stream`: a `step` event after each agent node (retrieve,
+grade, rewrite, generate, verify) and a final `answer` event with citations, so a UI can show
+progress instead of waiting on the full pipeline.
+
 ## Evaluation
 
 Gold set: 25 answerable questions across 8 SOPs and policies, plus 3 out-of-scope questions the system
