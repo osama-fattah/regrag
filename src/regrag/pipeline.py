@@ -72,6 +72,10 @@ class RegRAG:
     def from_settings(cls, settings: Settings | None = None) -> RegRAG:
         s = settings or Settings.from_env()
         index = HybridIndex.load(s.index_dir, get_embedder(s))
+        if s.reranker:
+            from regrag.rerank import load_reranker
+
+            index.reranker = load_reranker(s.reranker)
         reasoner = get_reasoner(get_llm(s), idf=index.bm25.idf)
         return cls(index, reasoner, AuditLog(s.audit_log), s.top_k, s.max_rewrites)
 

@@ -175,6 +175,36 @@ Claude Desktop (`claude_desktop_config.json`):
 Tools are annotated read-only and non-destructive. Each document is also available as a resource at
 `regrag://documents/{doc_id}`.
 
+## LoRA fine-tuned reranker
+
+A cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) re-orders the hybrid retriever's
+top 20 candidates. `regrag finetune` adapts it to the SOP corpus with **LoRA**: only low-rank
+adapters on the attention query/value projections and the scoring head are trained, the base
+model stays frozen, and it trains on a laptop CPU in minutes.
+
+1. **Synthetic queries.** For each passage an LLM (`--queries llm`, e.g. Gemini) writes questions
+   the passage answers, in its own words. Any query too similar to either evaluation set (token
+   Jaccard >= 0.5) is dropped, so evaluation questions never leak into training.
+2. **Hard negatives.** Other passages the hybrid retriever ranks highly for the same query.
+3. **Training.** Binary cross-entropy on (query, passage) pairs; the adapter (a few hundred KB)
+   is saved to `models/reranker-lora`.
+4. **Evaluation.** Passage-level retrieval: is the exact passage containing the answer ranked
+   first? Measured on the gold set and on a held-out **paraphrase set** of 22 questions written
+   in everyday wording ("field rep", "lorry", "faking lab data") that does not match SOP
+   vocabulary, which is where hybrid retrieval struggles (passage hit@1 0.59, MRR 0.69).
+
+```bash
+pip install -e ".[finetune,gemini]"
+regrag finetune --queries llm      # trains, then compares no reranker / pretrained / LoRA
+export REGRAG_RERANKER=models/reranker-lora
+regrag ask "Vials were found frozen in the van - can they still be used?"
+```
+
+The comparison is written to `reports/rerank_report.md`. CI exercises the training, saving and
+loading path on a tiny randomly initialised model.
+
+<!-- TODO: paste the reports/rerank_report.md table here after the first real run -->
+
 ## Deploy to AWS (Terraform)
 
 `infra/terraform` deploys RegRAG as a container on **AWS Lambda** behind a **function URL**, sized
@@ -273,7 +303,7 @@ src/regrag/         library, agent, API and CLI
 data/sample_corpus/ 8 synthetic SOPs for a fictional company (no real or confidential content)
 data/registers/     synthetic CAPA register (CSV) used by the agent and MCP server
 data/eval/          gold question set
-tests/              unit, pipeline, agent, MCP, Gemini, API and evaluation-gate tests (32)
+tests/              unit, pipeline, agent, MCP, Gemini, API, fine-tuning and evaluation-gate tests (37)
 reports/            latest evaluation report
 ```
 

@@ -56,3 +56,18 @@ jobs:
           terraform -chdir=infra/terraform validate
       - name: Lambda image builds
         run: docker build -f Dockerfile.lambda -t regrag-lambda .
+
+  finetune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install CPU PyTorch, transformers, peft
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,finetune]"
+      - name: LoRA fine-tuning tests (tiny local model)
+        run: pytest -q tests/test_finetune.py

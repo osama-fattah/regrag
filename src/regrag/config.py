@@ -21,6 +21,7 @@ class Settings:
     top_k: int
     max_rewrites: int
     aws_region: str
+    reranker: str  # "" (none) | "base" | path to a LoRA adapter directory
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -34,4 +35,5 @@ class Settings:
             top_k=int(_env("REGRAG_TOP_K", "6")),
             max_rewrites=int(_env("REGRAG_MAX_REWRITES", "1")),
             aws_region=_env("AWS_REGION", "eu-west-1"),
+            reranker=_env("REGRAG_RERANKER", ""),
         )
