@@ -90,6 +90,19 @@ pip install -e ".[bedrock,openai]"
 regrag ingest && regrag eval
 ```
 
+### Free option: Gemini or GitHub Models
+
+The `openai` provider works with any OpenAI-compatible endpoint, so the free tiers of Google Gemini and
+GitHub Models run the full pipeline and agent with no code changes:
+
+```bash
+export OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+export OPENAI_API_KEY=<Gemini API key from Google AI Studio>
+export REGRAG_LLM=openai REGRAG_LLM_MODEL=gemini-2.5-flash
+export REGRAG_MAX_RPM=8          # stay under the free-tier rate limit
+pip install -e ".[openai]" && regrag eval
+```
+
 Point `regrag ingest --src` at any folder of PDFs (for example public EMA or ICH guidelines) to use
 your own corpus, and add questions to `data/eval/gold.jsonl`.
 
