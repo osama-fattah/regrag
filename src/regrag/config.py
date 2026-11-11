@@ -12,8 +12,8 @@ def _env(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    llm_provider: str  # offline | openai | azure | bedrock
-    embed_provider: str  # hashing | openai | azure | bedrock
+    llm_provider: str  # offline | openai | azure | bedrock | gemini
+    embed_provider: str  # hashing | openai | azure | bedrock | gemini
     llm_model: str
     embed_model: str
     index_dir: str
