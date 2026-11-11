@@ -20,6 +20,12 @@ def main(argv: list[str] | None = None) -> int:
     pa.add_argument("question")
     pa.add_argument("--json", action="store_true")
 
+    pg = sub.add_parser("agent", help="ask the tool-calling agent (SOPs + CAPA register)")
+    pg.add_argument("question")
+    pg.add_argument("--json", action="store_true")
+
+    sub.add_parser("mcp", help="run the MCP server over stdio (for Claude Desktop etc.)")
+
     pe = sub.add_parser("eval", help="run the gold set and write a report")
     pe.add_argument("--gold", default="data/eval/gold.jsonl")
     pe.add_argument("--out", default="reports")
@@ -54,6 +60,33 @@ def main(argv: list[str] | None = None) -> int:
             print(a.answer)
             for c in a.citations:
                 print(f"  [{c.n}] {c.title} > {c.section} ({c.chunk_id})")
+        return 0
+
+    if args.cmd == "agent":
+        import os
+
+        from regrag.agent import ToolAgent
+        from regrag.llm import get_tool_chat
+        from regrag.pipeline import RegRAG
+        from regrag.register import CapaRegister
+        from regrag.tools import Toolbox
+
+        path = os.getenv("REGRAG_CAPA_REGISTER", "data/registers/capa_register.csv")
+        register = CapaRegister.load(path) if os.path.exists(path) else None
+        r = ToolAgent(Toolbox(RegRAG.from_settings(s), register), get_tool_chat(s)).run(args.question)
+        if args.json:
+            print(json.dumps(r.to_dict(), indent=2))
+        else:
+            print(r.answer)
+            print("  tools: " + " -> ".join(f"{st.tool}({json.dumps(st.args)})" for st in r.steps))
+            if r.sources:
+                print("  sources: " + ", ".join(r.sources))
+        return 0
+
+    if args.cmd == "mcp":
+        from regrag.mcp_server import main as mcp_main
+
+        mcp_main()
         return 0
 
     if args.cmd == "eval":

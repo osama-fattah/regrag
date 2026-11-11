@@ -12,7 +12,7 @@
 | citation_precision | 1.0 |
 | grounded_rate | 1.0 |
 | abstention_accuracy | 1 |
-| mean_latency_ms | 2.143 |
+| mean_latency_ms | 1.821 |
 
 ## Questions to review
 

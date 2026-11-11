@@ -1,0 +1,13 @@
+capa_id,deviation_id,title,classification,status,owner_area,opened,due,effectiveness_check_due,procedure
+CAPA-2026-001,DEV-2026-0012,Recalibrate fill-weight checkweigher on Line 2,major,closed,Manufacturing,2026-01-14,2026-03-15,2026-06-13,QA-014
+CAPA-2026-002,DEV-2026-0019,Retrain warehouse staff on cold-chain receipt checks,minor,closed,Warehouse,2026-02-03,2026-03-31,,GDP-003
+CAPA-2026-003,DEV-2026-0027,Enable audit trail on legacy HPLC data system,critical,effectiveness_check,QC Laboratory,2026-02-20,2026-04-20,2026-07-19,QA-020
+CAPA-2026-004,DEV-2026-0031,Replace shared login on environmental monitoring PC,major,closed,QC Laboratory,2026-03-02,2026-04-30,2026-07-29,QA-020
+CAPA-2026-005,DEV-2026-0044,Revise ICSR intake form to capture day zero,major,open,Pharmacovigilance,2026-04-11,2026-06-10,,PV-001
+CAPA-2026-006,DEV-2026-0052,Add second-person review for serious case narratives,major,effectiveness_check,Pharmacovigilance,2026-05-06,2026-07-05,2026-10-03,PV-001
+CAPA-2026-007,DEV-2026-0058,Temperature excursion during transport to Belfast depot,critical,open,Distribution,2026-06-18,2026-08-17,,GDP-003
+CAPA-2026-008,DEV-2026-0063,Update LIMS configuration specification after upgrade,minor,open,IT,2026-07-22,2026-09-20,,IT-007
+CAPA-2026-009,DEV-2026-0071,Change request raised after implementation (missing approval),major,open,Engineering,2026-08-09,2026-10-08,,QA-005
+CAPA-2026-010,DEV-2026-0077,Overdue GxP training for aseptic operators,major,open,Manufacturing,2026-09-15,2026-11-14,,HR-010
+CAPA-2026-011,DEV-2026-0080,Unapproved generative AI tool used for batch record summaries,critical,open,Quality Assurance,2026-10-02,2026-12-01,,IT-031
+CAPA-2026-012,DEV-2026-0084,Periodic review of high-risk MES overdue,major,open,IT,2026-10-20,2026-12-19,,IT-007

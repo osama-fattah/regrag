@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -58,6 +59,177 @@ class BedrockChat:
         text = "".join(b.get("text", "") for b in r["output"]["message"]["content"])
         u = r.get("usage", {})
         return LLMResult(text, u.get("inputTokens", 0), u.get("outputTokens", 0))
+
+
+# ---- native tool calling ---------------------------------------------------------------------
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    args: dict
+
+
+@dataclass
+class ToolTurn:
+    text: str
+    calls: list[ToolCall]
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+class ToolChat(Protocol):
+    """A multi-turn conversation in which the model may request tool calls."""
+
+    name: str
+
+    def start(self, system: str, user: str, tools: list) -> None: ...
+    def step(self) -> ToolTurn: ...
+    def add_tool_results(self, results: list[tuple[ToolCall, object]]) -> None: ...
+    def add_user(self, text: str) -> None: ...
+
+
+def _as_dict(result: object) -> dict:
+    return result if isinstance(result, dict) else {"result": result}
+
+
+class OpenAIToolChat:
+    """OpenAI / Azure OpenAI chat completions with `tools`."""
+
+    def __init__(self, model: str, azure: bool = False, client=None):
+        if client is None:
+            import openai
+
+            client = openai.AzureOpenAI() if azure else openai.OpenAI()
+        self.client, self.model = client, model
+        self.name = f"{'azure' if azure else 'openai'}:{model}"
+        self.messages: list[dict] = []
+        self.tools: list[dict] = []
+
+    def start(self, system, user, tools):
+        self.messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        self.tools = [
+            {
+                "type": "function",
+                "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
+            }
+            for t in tools
+        ]
+
+    def step(self) -> ToolTurn:
+        r = self.client.chat.completions.create(
+            model=self.model, messages=self.messages, tools=self.tools, temperature=0
+        )
+        msg = r.choices[0].message
+        calls = [
+            ToolCall(tc.id, tc.function.name, json.loads(tc.function.arguments or "{}"))
+            for tc in (msg.tool_calls or [])
+        ]
+        entry: dict = {"role": "assistant", "content": msg.content or ""}
+        if calls:
+            entry["tool_calls"] = [
+                {
+                    "id": c.id,
+                    "type": "function",
+                    "function": {"name": c.name, "arguments": json.dumps(c.args)},
+                }
+                for c in calls
+            ]
+        self.messages.append(entry)
+        u = r.usage
+        return ToolTurn(msg.content or "", calls, u.prompt_tokens, u.completion_tokens)
+
+    def add_tool_results(self, results):
+        for call, result in results:
+            self.messages.append(
+                {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, default=str)}
+            )
+
+    def add_user(self, text):
+        self.messages.append({"role": "user", "content": text})
+
+
+class BedrockToolChat:
+    """AWS Bedrock Converse API with `toolConfig`."""
+
+    def __init__(self, model: str, region: str, client=None):
+        if client is None:
+            import boto3
+
+            client = boto3.client("bedrock-runtime", region_name=region)
+        self.client, self.model = client, model
+        self.name = f"bedrock:{model}"
+        self.messages: list[dict] = []
+        self.system: list[dict] = []
+        self.tool_config: dict = {}
+
+    def start(self, system, user, tools):
+        self.system = [{"text": system}]
+        self.messages = [{"role": "user", "content": [{"text": user}]}]
+        self.tool_config = {
+            "tools": [
+                {
+                    "toolSpec": {
+                        "name": t.name,
+                        "description": t.description,
+                        "inputSchema": {"json": t.parameters},
+                    }
+                }
+                for t in tools
+            ]
+        }
+
+    def step(self) -> ToolTurn:
+        r = self.client.converse(
+            modelId=self.model,
+            system=self.system,
+            messages=self.messages,
+            toolConfig=self.tool_config,
+            inferenceConfig={"maxTokens": 1000, "temperature": 0},
+        )
+        msg = r["output"]["message"]
+        self.messages.append(msg)
+        text = "".join(b.get("text", "") for b in msg["content"])
+        calls = [
+            ToolCall(b["toolUse"]["toolUseId"], b["toolUse"]["name"], b["toolUse"].get("input") or {})
+            for b in msg["content"]
+            if "toolUse" in b
+        ]
+        u = r.get("usage", {})
+        return ToolTurn(text, calls, u.get("inputTokens", 0), u.get("outputTokens", 0))
+
+    def add_tool_results(self, results):
+        self.messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "toolResult": {
+                            "toolUseId": call.id,
+                            "content": [{"json": json.loads(json.dumps(_as_dict(result), default=str))}],
+                        }
+                    }
+                    for call, result in results
+                ],
+            }
+        )
+
+    def add_user(self, text):
+        self.messages.append({"role": "user", "content": [{"text": text}]})
+
+
+def get_tool_chat(settings: Settings) -> ToolChat | None:
+    p, m = settings.llm_provider, settings.llm_model
+    if p == "offline":
+        return None
+    if p == "openai":
+        return OpenAIToolChat(m or "gpt-4o-mini")
+    if p == "azure":
+        return OpenAIToolChat(m or "gpt-4o-mini", azure=True)
+    if p == "bedrock":
+        return BedrockToolChat(m or "anthropic.claude-3-5-haiku-20241022-v1:0", settings.aws_region)
+    raise ValueError(f"Unknown LLM provider: {p}")
 
 
 def get_llm(settings: Settings) -> LLM | None:
