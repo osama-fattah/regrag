@@ -8,6 +8,8 @@ environment variable.
 
 ![ci](https://github.com/osama-fattah/regrag/actions/workflows/ci.yml/badge.svg)
 
+**[Try the live demo →](https://regrag-demo.streamlit.app)** (offline mode, no sign-up)
+
 ## Why this exists
 
 In regulated industries a wrong answer with confidence is worse than no answer. An assistant that
@@ -48,7 +50,7 @@ flowchart LR
 | Guardrails | Redacts emails, phone numbers, patient IDs and dates of birth before anything is logged or sent to a model; flags prompt-injection patterns; retrieved text is fenced as data in prompts | `guardrails.py`, `prompts.py` |
 | Audit log | One JSONL record per request: hashed user, redacted question, retrieved and cited chunks, model, embedder, grounded/abstained, tokens, latency | `audit.py` |
 | Evaluation | Retrieval (hit@k, MRR, recall@k), answer (key-fact recall, citation precision, grounded rate), abstention accuracy, optional LLM-judge relevancy, CI quality gate | `eval/` |
-| Serving | FastAPI (`/ask`, `/health`), Docker image with a non-root user, GitHub Actions CI with a container smoke test | `api.py`, `Dockerfile` |
+| Serving | Streamlit demo UI, FastAPI (`/ask`, `/health`), Docker image with a non-root user, GitHub Actions CI with a container smoke test | `api.py`, `Dockerfile` |
 
 ## Quickstart
 
@@ -58,6 +60,7 @@ regrag ingest                      # index data/sample_corpus (offline embedding
 regrag ask "How many days do we have to submit a serious ICSR?"
 regrag eval --gate                 # run the gold set; fails if quality regresses
 regrag serve                       # http://127.0.0.1:8000/docs
+streamlit run streamlit_app.py     # the demo UI (pip install streamlit)
 ```
 
 ```text

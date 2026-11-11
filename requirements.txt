@@ -1,0 +1,3 @@
+# Used by Streamlit Community Cloud to install the demo. For development use: pip install -e ".[dev]"
+.
+streamlit>=1.36
