@@ -9,7 +9,7 @@ import sys
 from regrag.config import Settings
 
 
-def main(argv: list[str] | None = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="regrag", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -109,6 +109,21 @@ def main(argv: list[str] | None = None) -> int:
         uvicorn.run("regrag.api:app", host=args.host, port=args.port)
         return 0
     return 2
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except Exception as e:  # show the provider's own error text (e.g. Gemini's JSON-array errors)
+        resp = getattr(e, "response", None)
+        if resp is None or not hasattr(resp, "text"):
+            raise
+        print(f"Model API error {getattr(resp, 'status_code', '?')}: {resp.text[:1500]}", file=sys.stderr)
+        print(
+            "Check OPENAI_API_KEY, OPENAI_BASE_URL (with trailing slash) and REGRAG_LLM_MODEL.",
+            file=sys.stderr,
+        )
+        return 1
 
 
 if __name__ == "__main__":
