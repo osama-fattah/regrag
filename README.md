@@ -203,7 +203,22 @@ regrag ask "Vials were found frozen in the van - can they still be used?"
 The comparison is written to `reports/rerank_report.md`. CI exercises the training, saving and
 loading path on a tiny randomly initialised model.
 
-<!-- TODO: paste the reports/rerank_report.md table here after the first real run -->
+**Results** (laptop CPU; 71 Gemini-generated training queries, 1 dropped for eval overlap; LoRA
+r=8 on 74k of 22.8M parameters, 3 epochs, 94 s):
+
+| Retriever | Gold set hit@1 / MRR | Paraphrase set hit@1 / MRR |
+| --- | --- | --- |
+| Hybrid BM25 + dense (no reranker) | 1.00 / 1.00 | 0.59 / 0.69 |
+| + pretrained cross-encoder | 1.00 / 1.00 | **0.77 / 0.83** |
+| + LoRA fine-tuned cross-encoder | 1.00 / 1.00 | 0.77 / 0.83 |
+
+**Reading it honestly.** Reranking is the big win: on questions phrased in everyday language it
+moves the right passage to first place 77% of the time instead of 59%, without hurting the gold set.
+LoRA fine-tuning trained cleanly (loss 1.07 → 0.49) but matched rather than beat the pretrained
+model: 71 synthetic queries over 8 documents is too little signal to improve on a model trained on
+MS MARCO's ~500k queries. I didn't tune hyperparameters against the 22 test questions, since that
+would only overfit the test set. A larger corpus, more queries per passage and a validation split
+carved from the synthetic data are the next steps.
 
 ## Deploy to AWS (Terraform)
 
