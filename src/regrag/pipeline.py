@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from regrag.audit import AuditLog
 from regrag.config import Settings
@@ -74,12 +76,33 @@ class RegRAG:
         return cls(index, reasoner, AuditLog(s.audit_log), s.top_k, s.max_rewrites)
 
     def ask(self, question: str, user: str = "anonymous") -> Answer:
+        answer = None
+        for kind, payload in self.stream(question, user):
+            if kind == "answer":
+                answer = payload
+        return answer
+
+    def stream(self, question: str, user: str = "anonymous") -> Iterator[tuple[str, Any]]:
+        """Run the agent, yielding ("step", {...}) after each LangGraph node and finally
+        ("answer", Answer). Used by ask() and by the server-sent-events endpoint."""
         t0 = time.perf_counter()
         request_id = uuid.uuid4().hex[:12]
         guard = check_input(question)
         before = (self.reasoner.usage.input_tokens, self.reasoner.usage.output_tokens)
 
-        state = self.graph.invoke(initial_state(guard.text))
+        state: dict = dict(initial_state(guard.text))
+        for update in self.graph.stream(state, stream_mode="updates"):
+            for node, changes in update.items():
+                state.update(changes or {})
+                yield (
+                    "step",
+                    {
+                        "request_id": request_id,
+                        "node": node,
+                        "detail": (state.get("trace") or [""])[-1],
+                        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
+                    },
+                )
 
         relevant = state.get("relevant") or []
         draft = state.get("draft")
@@ -127,4 +150,4 @@ class RegRAG:
                 "latency_ms": ans.latency_ms,
             }
         )
-        return ans
+        yield "answer", ans

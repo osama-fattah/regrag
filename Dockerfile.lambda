@@ -1,0 +1,19 @@
+# Image for AWS Lambda (container). The AWS Lambda Web Adapter runs the unchanged FastAPI app,
+# including server-sent-event streaming via a RESPONSE_STREAM function URL.
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS adapter
+
+FROM python:3.12-slim
+COPY --from=adapter /lambda-adapter /opt/extensions/lambda-adapter
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8080
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir ".[openai,bedrock,gemini]"
+
+COPY data ./data
+RUN regrag ingest --src data/sample_corpus
+
+# Lambda's filesystem is read-only except /tmp; the index is baked in and audit goes to stdout.
+CMD ["uvicorn", "regrag.api:app", "--host", "0.0.0.0", "--port", "8080"]

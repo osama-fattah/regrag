@@ -91,3 +91,27 @@ def test_rejected_draft_and_unsupported_claims_are_audited(index, tmp_path):
     assert a.abstained and a.unsupported_claims == ["3 days"] and "3 days" in a.rejected_draft
     record = json.loads((tmp_path / "a.jsonl").read_text(encoding="utf-8").splitlines()[-1])
     assert record["unsupported_claims"] == ["3 days"] and record["rejected_draft"].startswith("Serious cases")
+
+
+def test_streaming_endpoint_emits_steps_then_answer(rag):
+    client = TestClient(create_app(rag))
+    with client.stream(
+        "POST", "/ask/stream", json={"question": "How long must GxP records be retained?"}
+    ) as r:
+        assert r.headers["content-type"].startswith("text/event-stream")
+        body = "".join(r.iter_text())
+    events = [blk for blk in body.strip().split("\n\n") if blk]
+    kinds = [e.split("\n")[0].removeprefix("event: ") for e in events]
+    assert kinds[-1] == "answer" and kinds.count("answer") == 1
+    nodes = [json.loads(e.split("\n")[1].removeprefix("data: "))["node"] for e in events[:-1]]
+    assert nodes[:2] == ["retrieve", "grade"] and "verify" in nodes
+    final = json.loads(events[-1].split("\n")[1].removeprefix("data: "))
+    assert "ten years" in final["answer"]
+
+
+def test_audit_to_stdout_for_cloudwatch(capsys):
+    from regrag.audit import AuditLog
+
+    AuditLog("-").write({"request_id": "abc"})
+    rec = json.loads(capsys.readouterr().out)
+    assert rec["request_id"] == "abc" and rec["audit"] is True
