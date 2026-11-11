@@ -1,0 +1,28 @@
+{"id": "q01", "question": "How many days do we have to submit a serious ICSR to EudraVigilance?", "gold_docs": ["pv-001-icsr-handling"], "key_facts": ["15 calendar days"]}
+{"id": "q02", "question": "What is the deadline for submitting non-serious EEA cases?", "gold_docs": ["pv-001-icsr-handling"], "key_facts": ["90 calendar days"]}
+{"id": "q03", "question": "What are the four minimum criteria for a valid safety case?", "gold_docs": ["pv-001-icsr-handling"], "key_facts": ["reporter", "patient", "adverse reaction", "medicinal product"]}
+{"id": "q04", "question": "When does day zero start if a sales rep hears about an adverse event?", "gold_docs": ["pv-001-icsr-handling"], "key_facts": ["first becomes aware"]}
+{"id": "q05", "question": "Within what time must critical deviations be escalated to the Qualified Person?", "gold_docs": ["qa-014-deviation-capa"], "key_facts": ["24 hours"]}
+{"id": "q06", "question": "How long do we have to complete a root cause investigation for a deviation?", "gold_docs": ["qa-014-deviation-capa"], "key_facts": ["30 calendar days"]}
+{"id": "q07", "question": "When is the CAPA effectiveness check performed?", "gold_docs": ["qa-014-deviation-capa"], "key_facts": ["90 days"]}
+{"id": "q08", "question": "Can a batch be released while a major deviation is still open?", "gold_docs": ["qa-014-deviation-capa"], "key_facts": ["cannot be released"]}
+{"id": "q09", "question": "What does ALCOA+ stand for?", "gold_docs": ["qa-020-data-integrity"], "key_facts": ["attributable", "contemporaneous"]}
+{"id": "q10", "question": "Are shared user accounts allowed on GxP systems?", "gold_docs": ["qa-020-data-integrity"], "key_facts": ["prohibited"]}
+{"id": "q11", "question": "How often must audit trails for critical data be reviewed?", "gold_docs": ["qa-020-data-integrity"], "key_facts": ["monthly"]}
+{"id": "q12", "question": "How long must GxP records be retained?", "gold_docs": ["qa-020-data-integrity"], "key_facts": ["ten years"]}
+{"id": "q13", "question": "Which GAMP category applies to custom bespoke software?", "gold_docs": ["it-007-computerised-system-validation"], "key_facts": ["category 5"]}
+{"id": "q14", "question": "How often are high-risk validated systems periodically reviewed?", "gold_docs": ["it-007-computerised-system-validation"], "key_facts": ["every year"]}
+{"id": "q15", "question": "Is retraining a machine learning model treated as a change?", "gold_docs": ["it-007-computerised-system-validation"], "key_facts": ["change control"]}
+{"id": "q16", "question": "Can I paste patient-identifiable data into a generative AI tool?", "gold_docs": ["it-031-generative-ai-use"], "key_facts": ["never"]}
+{"id": "q17", "question": "How long are logs from internal AI assistants kept?", "gold_docs": ["it-031-generative-ai-use"], "key_facts": ["two years"]}
+{"id": "q18", "question": "Who must review generative AI output before it is used in a regulatory submission?", "gold_docs": ["it-031-generative-ai-use"], "key_facts": ["qualified person"]}
+{"id": "q19", "question": "Which body reviews AI systems that could be high-risk under the EU AI Act?", "gold_docs": ["it-031-generative-ai-use"], "key_facts": ["ai governance board"]}
+{"id": "q20", "question": "Can a change needing a Type II variation be implemented before health authority approval?", "gold_docs": ["qa-005-change-control"], "key_facts": ["cannot be implemented"]}
+{"id": "q21", "question": "How quickly must emergency changes be documented in the eQMS?", "gold_docs": ["qa-005-change-control"], "key_facts": ["two business days"]}
+{"id": "q22", "question": "What is the required storage temperature range for biologic products?", "gold_docs": ["gdp-003-temperature-excursions"], "key_facts": ["2 °c to 8 °c"]}
+{"id": "q23", "question": "What happens to a biologic product that was frozen below 0 °C?", "gold_docs": ["gdp-003-temperature-excursions"], "key_facts": ["rejected"]}
+{"id": "q24", "question": "What pass mark is needed on training assessments for critical procedures?", "gold_docs": ["hr-010-gxp-training"], "key_facts": ["80%"]}
+{"id": "q25", "question": "What is the default period between procedure approval and effective date?", "gold_docs": ["hr-010-gxp-training"], "key_facts": ["14 calendar days"]}
+{"id": "u01", "question": "What is the company's parental leave policy?", "gold_docs": [], "key_facts": [], "answerable": false}
+{"id": "u02", "question": "Which stock exchange is Northwind listed on?", "gold_docs": [], "key_facts": [], "answerable": false}
+{"id": "u03", "question": "What was the revenue of the oncology franchise last year?", "gold_docs": [], "key_facts": [], "answerable": false}
