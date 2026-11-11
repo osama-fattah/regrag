@@ -1,8 +1,10 @@
 # RegRAG
 
 **An agentic, evaluated RAG assistant for pharma GxP and regulatory knowledge.**
-Hybrid retrieval, a LangGraph agent that checks its own work and refuses to guess, PII guardrails, an
-audit log for every answer, and an evaluation suite that runs as a quality gate in CI. It runs fully
+Hybrid retrieval, a LangGraph agent that checks its own work and refuses to guess, a tool-calling
+agent that combines documents with a structured CAPA register, an **MCP server** so Claude Desktop or
+any MCP client can use it, PII guardrails, an audit log for every answer, and an evaluation suite
+that runs as a quality gate in CI. It runs fully
 offline out of the box and switches to **AWS Bedrock**, **Azure OpenAI** or **OpenAI** with one
 environment variable.
 
@@ -50,6 +52,8 @@ flowchart LR
 | Guardrails | Redacts emails, phone numbers, patient IDs and dates of birth before anything is logged or sent to a model; flags prompt-injection patterns; retrieved text is fenced as data in prompts | `guardrails.py`, `prompts.py` |
 | Audit log | One JSONL record per request: hashed user, redacted question, retrieved and cited chunks, model, embedder, grounded/abstained, tokens, latency | `audit.py` |
 | Evaluation | Retrieval (hit@k, MRR, recall@k), answer (key-fact recall, citation precision, grounded rate), abstention accuracy, optional LLM-judge relevancy, CI quality gate | `eval/` |
+| Tool-calling agent | Planner/executor loop with native tool calling (OpenAI, Azure OpenAI, Bedrock Converse) over SOP search, cited answers and a CAPA register; validated JSON output with one repair attempt; offline deterministic planner for CI | `agent.py`, `tools.py`, `llm.py` |
+| MCP server | The same read-only tools plus a `regrag://documents/{doc_id}` resource, over stdio | `mcp_server.py` |
 | Serving | Streamlit demo UI, FastAPI (`/ask`, `/health`), Docker image with a non-root user, GitHub Actions CI with a container smoke test | `api.py`, `Dockerfile` |
 
 ## Quickstart
@@ -88,6 +92,68 @@ regrag ingest && regrag eval
 
 Point `regrag ingest --src` at any folder of PDFs (for example public EMA or ICH guidelines) to use
 your own corpus, and add questions to `data/eval/gold.jsonl`.
+
+## Tool-calling agent
+
+Some questions need records, not documents: *"Which critical CAPAs are overdue, and what must happen
+within 24 hours of a critical deviation?"* The agent plans which tools to call, runs them, and answers
+from their results only.
+
+```text
+$ regrag agent "Which critical CAPAs are overdue, and what must happen within 24 hours of a critical deviation?"
+2 CAPAs match. CAPA-2026-003 (Enable audit trail on legacy HPLC data system; critical, QA-020) is in
+effectiveness check, due 2026-07-19 (OVERDUE). CAPA-2026-007 (Temperature excursion during transport to
+Belfast depot; critical, GDP-003) is open, due 2026-08-17 (OVERDUE). Critical deviations must be escalated
+to the Qualified Person and the Head of Quality within 24 hours. [1]
+  tools: query_capa_register({"classification": "critical", "overdue_as_of": "2026-11-12"}) -> ask_sops(...)
+  sources: CAPA-2026-003, CAPA-2026-007, qa-014-deviation-capa#003
+```
+
+| Tool | What it does |
+| --- | --- |
+| `search_sops` | Hybrid search; returns passages with document, section and chunk id |
+| `ask_sops` | The full grounded pipeline: cited answer or abstention |
+| `query_capa_register` | Filters CAPA records by id, deviation, status, classification, procedure, or overdue date |
+| `list_documents` | Lists the approved documents |
+
+Guardrails specific to the agent:
+
+- **No answers from model memory.** If the model answers without calling a tool, the agent refuses.
+- **Sources must be real.** Every source in the final JSON must have appeared in a tool result;
+  anything else is dropped and recorded in `dropped_sources` and the audit log.
+- **Structured output.** The final answer is validated against a Pydantic schema, with one repair
+  round if the model returns invalid JSON.
+- **Tool errors are data.** Bad arguments come back to the model as an error message so it can retry,
+  instead of crashing the loop. All tools are read-only.
+
+## MCP server
+
+Expose the same tools to Claude Desktop, Cursor or any MCP client:
+
+```bash
+regrag ingest                     # build the index once
+regrag mcp                        # stdio MCP server
+```
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "regrag": {
+      "command": "regrag",
+      "args": ["mcp"],
+      "env": {
+        "REGRAG_INDEX_DIR": "/absolute/path/to/regrag/.index",
+        "REGRAG_CAPA_REGISTER": "/absolute/path/to/regrag/data/registers/capa_register.csv"
+      }
+    }
+  }
+}
+```
+
+Tools are annotated read-only and non-destructive. Each document is also available as a resource at
+`regrag://documents/{doc_id}`.
 
 ## Evaluation
 
@@ -135,7 +201,8 @@ corpus retrieval is near-trivial, so treat these as a regression baseline, not a
 
 - Cross-encoder re-ranking (Bedrock Rerank / Cohere) and a re-ranking ablation in the eval report
 - pgvector backend for multi-tenant deployment
-- LangSmith tracing and a RAGAs comparison run
+- LangSmith / OpenTelemetry tracing and a RAGAs comparison run
+- Agent evaluation set (tool-selection accuracy, answer correctness on register + SOP questions)
 - Terraform module for ECS Fargate + Bedrock with private VPC endpoints
 
 ## Project layout
@@ -143,8 +210,9 @@ corpus retrieval is near-trivial, so treat these as a regression baseline, not a
 ```
 src/regrag/         library, agent, API and CLI
 data/sample_corpus/ 8 synthetic SOPs for a fictional company (no real or confidential content)
+data/registers/     synthetic CAPA register (CSV) used by the agent and MCP server
 data/eval/          gold question set
-tests/              unit, pipeline, API and evaluation-gate tests
+tests/              unit, pipeline, agent, MCP, API and evaluation-gate tests (25)
 reports/            latest evaluation report
 ```
 
