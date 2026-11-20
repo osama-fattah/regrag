@@ -1,4 +1,4 @@
-"""Command line: regrag ingest | ask | eval | serve."""
+"""Command line: regrag ingest | ask | agent | eval | eval-agent | serve."""
 
 from __future__ import annotations
 
@@ -42,6 +42,12 @@ def _main(argv: list[str] | None = None) -> int:
     pe.add_argument("--gold", default="data/eval/gold.jsonl")
     pe.add_argument("--out", default="reports")
     pe.add_argument("--gate", action="store_true", help="exit 1 if metrics fall below thresholds")
+
+    pv = sub.add_parser("eval-agent", help="score the agent's tool selection, sources and abstention")
+    pv.add_argument("--gold", default="data/eval/agent_gold.jsonl")
+    pv.add_argument("--out", default="reports")
+    pv.add_argument("--as-of", default=None, help="date the agent treats as today (default: gold-set date)")
+    pv.add_argument("--gate", action="store_true", help="exit 1 if metrics fall below thresholds")
 
     ps = sub.add_parser("serve", help="run the API")
     ps.add_argument("--host", default="127.0.0.1")
@@ -118,12 +124,43 @@ def _main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
+    if args.cmd == "eval-agent":
+        return _eval_agent(args, s)
+
     if args.cmd == "serve":
         import uvicorn
 
         uvicorn.run("regrag.api:app", host=args.host, port=args.port)
         return 0
     return 2
+
+
+def _eval_agent(args, s: Settings) -> int:
+    import os
+    from datetime import date
+
+    from regrag.agent import ToolAgent
+    from regrag.eval.agent_eval import DEFAULT_AS_OF, evaluate_agent, write_agent_report
+    from regrag.eval.agent_eval import DEFAULT_GATES as AGENT_GATES
+    from regrag.eval.run import check_gates, load_gold
+    from regrag.llm import get_tool_chat
+    from regrag.pipeline import RegRAG
+    from regrag.register import CapaRegister
+    from regrag.tools import Toolbox
+
+    register = CapaRegister.load(os.getenv("REGRAG_CAPA_REGISTER", "data/registers/capa_register.csv"))
+    today = date.fromisoformat(args.as_of) if args.as_of else DEFAULT_AS_OF
+    chat = get_tool_chat(s)
+    agent = ToolAgent(Toolbox(RegRAG.from_settings(s), register), chat, today=today)
+    rows, summary = evaluate_agent(agent, load_gold(args.gold))
+    label = f"{chat.name if chat else 'offline-planner'}, as of {today.isoformat()}"
+    path = write_agent_report(rows, summary, args.out, label)
+    print(json.dumps(summary, indent=2))
+    print(f"Report: {path}")
+    if args.gate and (failures := check_gates(summary, AGENT_GATES)):
+        print("Agent quality gate FAILED:\n  " + "\n  ".join(failures), file=sys.stderr)
+        return 1
+    return 0
 
 
 def _finetune(args, s: Settings) -> int:

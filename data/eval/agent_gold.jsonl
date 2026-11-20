@@ -1,0 +1,20 @@
+{"id": "a01", "question": "Which critical CAPAs are overdue?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-003", "CAPA-2026-007"], "key_facts": []}
+{"id": "a02", "question": "What is the status of CAPA-2026-009?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-009"], "key_facts": ["open", "2026-10-08", "overdue"]}
+{"id": "a03", "question": "Which CAPA was raised for deviation DEV-2026-0058?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-007"], "key_facts": ["temperature excursion"]}
+{"id": "a04", "question": "List the CAPAs currently in effectiveness check.", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-003", "CAPA-2026-006"], "key_facts": []}
+{"id": "a05", "question": "Which major CAPAs are overdue?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-005", "CAPA-2026-006", "CAPA-2026-009"], "key_facts": []}
+{"id": "a06", "question": "How many open minor CAPAs are there?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-008"], "key_facts": []}
+{"id": "a07", "question": "Are any pharmacovigilance CAPAs overdue?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-005", "CAPA-2026-006"], "key_facts": []}
+{"id": "a08", "question": "Which deviations are still open?", "expected_tools": ["register"], "expected_sources": ["CAPA-2026-005", "CAPA-2026-007", "CAPA-2026-008", "CAPA-2026-009", "CAPA-2026-010", "CAPA-2026-011", "CAPA-2026-012"], "key_facts": []}
+{"id": "a09", "question": "CAPA-2026-006 is in effectiveness check. When must the check be done per our SOP?", "expected_tools": ["register", "sops"], "expected_sources": ["CAPA-2026-006", "qa-014-deviation-capa"], "key_facts": ["90 days"]}
+{"id": "a10", "question": "CAPA-2026-007 is a temperature excursion. What happens to a biologic product that was frozen below 0 °C?", "expected_tools": ["register", "sops"], "expected_sources": ["CAPA-2026-007", "gdp-003-temperature-excursions"], "key_facts": ["rejected"]}
+{"id": "a11", "question": "CAPA-2026-011 involves an unapproved AI tool. Can patient-identifiable data be pasted into a generative AI tool?", "expected_tools": ["register", "sops"], "expected_sources": ["CAPA-2026-011", "it-031-generative-ai-use"], "key_facts": ["never"]}
+{"id": "a12", "question": "CAPA-2026-010 is about overdue training. What pass mark is required on assessments for critical procedures?", "expected_tools": ["register", "sops"], "expected_sources": ["CAPA-2026-010", "hr-010-gxp-training"], "key_facts": ["80%"]}
+{"id": "a13", "question": "For DEV-2026-0071, what does the change control procedure say about implementing a change before it is approved?", "expected_tools": ["register", "sops"], "expected_sources": ["CAPA-2026-009", "qa-005-change-control"], "key_facts": []}
+{"id": "a14", "question": "How many days do we have to submit a serious ICSR to EudraVigilance?", "expected_tools": ["sops"], "expected_sources": ["pv-001-icsr-handling"], "key_facts": ["15 calendar days"]}
+{"id": "a15", "question": "Within what time must critical deviations be escalated to the Qualified Person?", "expected_tools": ["sops"], "expected_sources": ["qa-014-deviation-capa"], "key_facts": ["24 hours"]}
+{"id": "a16", "question": "How often must audit trails for critical data be reviewed?", "expected_tools": ["sops"], "expected_sources": ["qa-020-data-integrity"], "key_facts": ["monthly"]}
+{"id": "a17", "question": "Which GAMP category applies to custom bespoke software?", "expected_tools": ["sops"], "expected_sources": ["it-007-computerised-system-validation"], "key_facts": ["category 5"]}
+{"id": "a18", "question": "What is the company's parental leave policy?", "expected_tools": ["sops"], "expected_sources": [], "key_facts": [], "answerable": false}
+{"id": "a19", "question": "Which stock exchange is Northwind listed on?", "expected_tools": ["sops"], "expected_sources": [], "key_facts": [], "answerable": false}
+{"id": "a20", "question": "Who owns CAPA-2026-099?", "expected_tools": ["register"], "expected_sources": [], "key_facts": [], "answerable": false}
