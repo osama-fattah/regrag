@@ -27,6 +27,42 @@ from regrag.tools import Toolbox
 
 CAPA_ID = re.compile(r"\bCAPA-\d{4}-\d{3}\b", re.I)
 DEV_ID = re.compile(r"\bDEV-\d{4}-\d{4}\b", re.I)
+PROC_ID = re.compile(r"\b(QA|PV|GDP|IT|HR)-\d{3}\b", re.I)
+MAX_LISTED = 10  # register rows summarised and cited in one answer
+
+# Topic words that map a register question onto the owning procedure (offline planner only).
+PROCEDURE_TOPICS = {
+    "PV-001": ("pharmacovigilance", "icsr", "safety case"),
+    "GDP-003": ("temperature", "cold chain", "cold-chain", "distribution"),
+    "QA-005": ("change control",),
+    "QA-020": ("data integrity", "audit trail"),
+    "IT-007": ("computerised system", "computerized system", "validation"),
+    "IT-031": ("generative ai", "ai tool"),
+    "HR-010": ("training",),
+}
+_REGISTER_WORDS = re.compile(r"\b(capas?|deviations?|status|overdue|owner|owns|due|open|closed)\b", re.I)
+
+
+def _procedure_filter(q: str) -> str | None:
+    if m := PROC_ID.search(q):
+        return m.group(0).upper()
+    hits = [p for p, words in PROCEDURE_TOPICS.items() if any(w in q for w in words)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _has_policy_question(question: str) -> bool:
+    """True if some sentence asks something that isn't about a register record, e.g. the second
+    half of "CAPA-2026-007 is a temperature excursion. What happens to frozen product?"."""
+    for sentence in re.split(r"(?<=[.?!])\s+", question):
+        if (
+            sentence.rstrip().endswith("?")
+            and not CAPA_ID.search(sentence)
+            and not DEV_ID.search(sentence)
+            and not _REGISTER_WORDS.search(sentence)
+        ):
+            return True
+    return False
+
 
 SYSTEM = """You are a GxP quality assistant for a pharmaceutical company. Today's date is {today}.
 You have tools for the approved SOPs/policies and for the CAPA register. Plan which tools you
@@ -190,12 +226,16 @@ class ToolAgent:
                 r"\bcapas?\b|\bdeviations?\b.*\b(open|overdue|status|which|list|how many)\b|\boverdue\b", q
             )
         )
-        wants_sop = (not wants_register) or bool(
-            re.search(
-                r"\b(sop|procedure|policy|require|requirement|deadline|how long|must|allowed|timeline|"
-                r"what does|what should|effectiveness check|escalat)",
-                q,
+        wants_sop = (
+            (not wants_register)
+            or bool(
+                re.search(
+                    r"\b(sop|procedure|policy|require|requirement|deadline|how long|must|allowed|timeline|"
+                    r"what does|what should|escalat)",
+                    q,
+                )
             )
+            or _has_policy_question(question)
         )
 
         parts: list[str] = []
@@ -211,6 +251,8 @@ class ToolAgent:
                 for c in ("critical", "major", "minor"):
                     if c in q:
                         filters["classification"] = c
+                if proc := _procedure_filter(q):
+                    filters["procedure"] = proc
                 if "overdue" in q:
                     filters["overdue_as_of"] = self.today.isoformat()
                 elif "effectiveness check" in q:
@@ -222,7 +264,7 @@ class ToolAgent:
             rows = self._execute("query_capa_register", filters, steps, known)
             if isinstance(rows, list) and rows:
                 parts.append(self._summarise_rows(rows))
-                sources += [r["capa_id"] for r in rows[:5]]
+                sources += [r["capa_id"] for r in rows[:MAX_LISTED]]
             else:
                 parts.append("No matching CAPAs in the register.")
 
@@ -251,6 +293,6 @@ class ToolAgent:
             return f"{r['capa_id']} ({r['title']}; {r['classification']}, {r['procedure']}) is {state}."
 
         head = "" if len(rows) == 1 else f"{len(rows)} CAPAs match. "
-        body = " ".join(line(r) for r in rows[:5])
-        tail = f" (+{len(rows) - 5} more)" if len(rows) > 5 else ""
+        body = " ".join(line(r) for r in rows[:MAX_LISTED])
+        tail = f" (+{len(rows) - MAX_LISTED} more)" if len(rows) > MAX_LISTED else ""
         return head + body + tail

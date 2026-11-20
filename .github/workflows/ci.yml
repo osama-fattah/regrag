@@ -23,6 +23,8 @@ jobs:
         run: |
           regrag ingest
           regrag eval --gate
+      - name: Agent evaluation gate (offline planner)
+        run: regrag eval-agent --gate
       - uses: actions/upload-artifact@v4
         if: always()
         with:

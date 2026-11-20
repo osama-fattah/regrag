@@ -146,6 +146,8 @@ Guardrails specific to the agent:
 - **Tool errors are data.** Bad arguments come back to the model as an error message so it can retry,
   instead of crashing the loop. All tools are read-only.
 
+Tool selection and citations are measured on their own gold set; see [Agent evaluation](#agent-evaluation).
+
 ## MCP server
 
 Expose the same tools to Claude Desktop, Cursor or any MCP client:
@@ -288,6 +290,37 @@ matched. Files are now read as UTF-8 and facts are matched after Unicode normali
 
 On an 8-document corpus retrieval is near-trivial, so treat these as regression baselines, not a benchmark.
 
+### Agent evaluation
+
+The tool-calling agent has its own gold set (`data/eval/agent_gold.jsonl`): 20 questions that need the
+CAPA register, the SOPs, or both, including 3 it must refuse (two out of scope, one about a CAPA id that
+doesn't exist). Each item lists the tool groups the question needs (`register`, `sops`: either
+`ask_sops` or `search_sops` counts) and the CAPA ids or documents a correct answer must cite. Overdue
+answers depend on the date, so the run is pinned to the date the set was written (`--as-of`).
+
+```bash
+regrag eval-agent            # writes reports/agent_eval_report.md; --gate fails CI on regressions
+```
+
+| Metric | Offline planner, first run | After planner fixes | What it means |
+| --- | --- | --- | --- |
+| Tool-selection accuracy | 0.85 | **1.00** | Used exactly the tool groups the question needs |
+| Source recall | 0.895 | **0.971** | Expected CAPAs / documents that were cited |
+| Source precision | 0.945 | **1.00** | Cited sources that were expected |
+| Key-fact recall | 0.80 | **1.00** | Answer states the required fact |
+| Abstention accuracy | 1.00 | 1.00 | Refused all 3 unanswerable questions |
+
+The first run found three planner bugs: a two-part question (*"CAPA-2026-007 is a temperature
+excursion. What happens to a biologic product that was frozen below 0 °C?"*) only queried the
+register; *"Are any pharmacovigilance CAPAs overdue?"* ignored the topic and returned every overdue
+CAPA; and list answers were cut at 5 records, so *"Which deviations are still open?"* cited 5 of 7.
+The planner now checks each sentence for a policy question, maps topic words to the owning procedure,
+and lists up to 10 records. The remaining miss is retrieval, not planning: the change-control
+question is routed correctly but `ask_sops` abstains on it. These fixes were made against this set,
+so the offline numbers are a regression baseline; the same command scores the LLM planner when a
+provider is configured. CI gates on tool-selection accuracy ≥ 0.9, source recall ≥ 0.8 and
+abstention accuracy = 1.0.
+
 ## Design decisions
 
 - **Abstain over improvise.** Three independent exits lead to a refusal: nothing relevant retrieved
@@ -308,7 +341,7 @@ On an 8-document corpus retrieval is near-trivial, so treat these as regression 
 - Cross-encoder re-ranking (Bedrock Rerank / Cohere) and a re-ranking ablation in the eval report
 - pgvector backend for multi-tenant deployment
 - LangSmith / OpenTelemetry tracing and a RAGAs comparison run
-- Agent evaluation set (tool-selection accuracy, answer correctness on register + SOP questions)
+- Agent evaluation run on a real model (Gemini / Bedrock) alongside the offline planner
 - Terraform module for ECS Fargate + Bedrock with private VPC endpoints
 
 ## Project layout
@@ -317,9 +350,9 @@ On an 8-document corpus retrieval is near-trivial, so treat these as regression 
 src/regrag/         library, agent, API and CLI
 data/sample_corpus/ 8 synthetic SOPs for a fictional company (no real or confidential content)
 data/registers/     synthetic CAPA register (CSV) used by the agent and MCP server
-data/eval/          gold question set
-tests/              unit, pipeline, agent, MCP, Gemini, API, fine-tuning and evaluation-gate tests (37)
-reports/            latest evaluation report
+data/eval/          gold question sets (RAG answers, hard retrieval, agent)
+tests/              unit, pipeline, agent, MCP, Gemini, API, fine-tuning and evaluation-gate tests
+reports/            latest RAG and agent evaluation reports
 ```
 
 The sample corpus describes a fictional company and was written for this project. Regulatory figures
